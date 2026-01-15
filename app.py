@@ -1,9 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for
 import os
+import time
 
 app = Flask(__name__)
 
 app.config['FLASK_TITLE'] = ""
+
+# Record the start time when the app starts
+start_time = time.time()
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
 # Phase 1: A simple Python List to store contacts
@@ -17,9 +21,16 @@ def index():
     Displays the main page.
     Eventually, students will pass their Linked List or Tree data here.
     """
+    # Change Flask HTMLtitle to my name
+    app.config['FLASK_TITLE'] = "Harrison's Contact List"
+
+    # Calculate elapsed time since app start
+    elapsed_time = time.time() - start_time
+
     return render_template('index.html', 
                          contacts=contacts, 
-                         title=app.config['FLASK_TITLE'])
+                         title=app.config['FLASK_TITLE'],
+                         elapsed_time=elapsed_time)
 
 @app.route('/add', methods=['POST'])
 def add_contact():
