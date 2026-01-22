@@ -5,13 +5,16 @@ import time
 app = Flask(__name__)
 
 app.config['FLASK_TITLE'] = ""
-
+ 
 # Record the start time when the app starts
 start_time = time.time()
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
 # Phase 1: A simple Python List to store contacts
-contacts = [] 
+contacts = [
+    {'name': 'Alice', 'email': 'alice@example.com'},
+    {'name': 'Bob', 'email': 'bob@example.com'}
+] 
 
 # --- ROUTES ---
 

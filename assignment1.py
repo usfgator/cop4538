@@ -1,10 +1,12 @@
-# import time and create a start timer
-import time
-start_time = time.time()
-n = 1000000
-for index in range(n):
-    pass
-end_time = time.time()
-elapsed_time = end_time - start_time
-print(f"Look of {n} iterations took {elapsed_time} seconds")
+# Configure SQLAlchemy connection string based on docker-compose environment variables
+import os
+DB_USER = os.getenv('DB_USER', 'student')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'password123')
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME', 'default_db')
+SQLALCHEMY_DATABASE_URI = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+print("SQLAlchemy Database URI:", SQLALCHEMY_DATABASE_URI)
+
+
 
