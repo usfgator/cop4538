@@ -49,6 +49,31 @@ def add_contact():
     
     return redirect(url_for('index'))
 
+@app.route('/search')
+def search_contact():
+    query = request.args.get('query')
+    def find(query):
+        for contact in contacts:
+            if contact['name'].lower() == query.lower():
+                return contact
+        return None
+    result = find(query)
+
+    #if result:
+    #    return f"Found contact: Name: {result['name']}, Email: {result['email']}"
+    #else:
+    #   return "Contact not found."
+  
+    # Render search results below the search form on the index page
+    return render_template('index.html', 
+                         contacts=contacts, 
+                         title=app.config['FLASK_TITLE'],
+                         elapsed_time=time.time() - start_time,
+                         search_result=result)
+
+
+
+
 # --- DATABASE CONNECTIVITY (For later phases) ---
 # Placeholders for students to fill in during Sessions 5 and 27
 def get_postgres_connection():

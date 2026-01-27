@@ -8,10 +8,36 @@
     </style>
 </head>
 <body>
-    <h1>{{ title }}'s Contact Manager</h1>
+    <h1>{{ title }}Harrison's Contact Manager</h1>
     
     <p>App has been running for: {{ "%.2f"|format(elapsed_time) }} seconds</p>
+    <!-- Copilot, create a form with a text input named "query" and a "Search" button  -->
+    <div style="background-color: #e0e0e0; padding: 15px; margin-bottom: 20px;">
+        <h3>Search Contacts</h3>
+        <form action="/search" method="GET">
+            <input type="text" name="query" placeholder="Search by name or email" required>
+            <button type="submit">Search</button>
+        </form>
+    </div>
+    <!-- Display search results below the search form and add logic to handle search result = None -->
+    {% if search_result is defined %}
+    <h3>Search Results</h3>
+    {% if search_result %}
+        <div class="card">
+            <strong>{{ search_result.name }}</strong> - {{ search_result.email }}
+        </div>
+    {% else %}
+        <p>No contact found matching your query.</p>
+    {% endif %}
+    <hr>
+    {% endif %}
+
+
+
+
+
     
+
     <div style="background-color: #f0f0f0; padding: 15px;">
         <h3>Add New Contact</h3>
         <form action="/add" method="POST">
