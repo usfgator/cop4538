@@ -11,10 +11,54 @@ start_time = time.time()
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
 # Phase 1: A simple Python List to store contacts
-contacts = [
-    {'name': 'Alice', 'email': 'alice@example.com'},
-    {'name': 'Bob', 'email': 'bob@example.com'}
-] 
+#contacts = [
+#    {'name': 'Alice', 'email': 'alice@example.com'},
+#    {'name': 'Bob', 'email': 'bob@example.com'}
+#]
+
+
+# Phase 2: Linked List implementation
+class Node:
+    def __init__(self, data):
+        self.data = data
+        self.next = None
+
+class LinkedList:
+    def __init__(self):
+        self.head = None
+
+    def append(self, data):
+        new_node = Node(data)
+        if not self.head:
+            self.head = new_node
+            return
+        last = self.head
+        while last.next:
+            last = last.next
+        last.next = new_node
+    def delete(self, key):
+        temp = self.head
+        if temp is not None:
+            if temp.data == key:
+                self.head = temp.next
+                temp = None
+                return
+        while temp is not None:
+            if temp.data == key:
+                break
+            prev = temp
+            temp = temp.next
+        if temp is None:
+            return
+        prev.next = temp.next
+        temp = None
+
+
+    
+contacts = LinkedList()
+contacts.append({'name': 'Alice', 'email': 'alice@example.com'})
+contacts.append({'name': 'Bob', 'email': 'bob@example.com'})
+
 
 # --- ROUTES ---
 
@@ -29,9 +73,16 @@ def index():
 
     # Calculate elapsed time since app start
     elapsed_time = time.time() - start_time
+    # Convert linked list to a list for rendering
+    contact_list = []
+    current = contacts.head
+    while current:
+        contact_list.append(current.data)
+        current = current.next
+    
 
     return render_template('index.html', 
-                         contacts=contacts, 
+                         contacts=contact_list, 
                          title=app.config['FLASK_TITLE'],
                          elapsed_time=elapsed_time)
 
