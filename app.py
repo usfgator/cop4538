@@ -12,8 +12,8 @@ start_time = time.time()
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
 # Phase 1: A simple Python List to store contacts
 #contacts = [
-#    {'name': 'Alice', 'email': 'alice@example.com'},
-#    {'name': 'Bob', 'email': 'bob@example.com'}
+#    ['alice', 'alice@example.com'],
+#    ['bob', 'bob@example.com']
 #]
 
 
@@ -52,12 +52,24 @@ class LinkedList:
             return
         prev.next = temp.next
         temp = None
-
-
-    
+    def find_by_name(self, name):
+        current = self.head
+        while current:
+            if current.data[0].lower() == name.lower():
+                return current.data
+            current = current.next
+        return None 
+    def __iter__(self):
+        current = self.head
+        while current:
+            yield current.data
+            current = current.next
+# Initialize linked list with sample contacts   
+ 
 contacts = LinkedList()
-contacts.append({'name': 'Alice', 'email': 'alice@example.com'})
-contacts.append({'name': 'Bob', 'email': 'bob@example.com'})
+contacts.append(['Alice', 'alice@example.com'])
+contacts.append(['Bob', 'bob@example.com'])
+
 
 
 # --- ROUTES ---
@@ -84,7 +96,9 @@ def index():
     return render_template('index.html', 
                          contacts=contact_list, 
                          title=app.config['FLASK_TITLE'],
-                         elapsed_time=elapsed_time)
+                         elapsed_time=elapsed_time,
+                         search_result=None
+                         )
 
 @app.route('/add', methods=['POST'])
 def add_contact():
@@ -96,31 +110,48 @@ def add_contact():
     email = request.form.get('email')
     
     # Phase 1 Logic: Append to list
-    contacts.append({'name': name, 'email': email})
+    contacts.append([name, email])
     
     return redirect(url_for('index'))
 
 @app.route('/search')
 def search_contact():
-    query = request.args.get('query')
-    def find(query):
-        for contact in contacts:
-            if contact['name'].lower() == query.lower():
-                return contact
-        return None
-    result = find(query)
-
-    #if result:
-    #    return f"Found contact: Name: {result['name']}, Email: {result['email']}"
-    #else:
-    #   return "Contact not found."
-  
-    # Render search results below the search form on the index page
+    query = request.args.get('query', '').strip()
+    result = None
+        
+    # Phase 2 Logic: Search in linked list
+    if query:
+        result = contacts.find_by_name(query)
+    
+    # Convert linked list to a list for rendering
+    contact_list = []
+    current = contacts.head
+    while current:
+        contact_list.append(current.data)
+        current = current.next
     return render_template('index.html', 
-                         contacts=contacts, 
+                         contacts=contact_list, 
                          title=app.config['FLASK_TITLE'],
                          elapsed_time=time.time() - start_time,
-                         search_result=result)
+                         search_result=result,
+                         search_query=query
+                        )
+
+    
+    # Phase 1 Logic: Search in list
+    #def find(query):
+    #    for contact in contacts:
+    #        if contact[0].lower() == query.lower():
+    #            return contact
+    #    return None
+    #result = find(query)
+
+    
+    #return render_template('index.html', 
+    #                     contacts=contacts, 
+    #                     title=app.config['FLASK_TITLE'],
+    #                     elapsed_time=time.time() - start_time,
+    #                     search_result=result)
 
 
 

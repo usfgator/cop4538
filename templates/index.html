@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{ title }} - Contact Manager</title>
+    <title>{{ title }}Contact Manager</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
@@ -20,11 +20,11 @@
         </form>
     </div>
     <!-- Copilot display search results below the search form and add logic to handle search result = None -->
-    {% if search_result is defined %}
+    {% if search_query %}
     <h3>Search Results</h3>
     {% if search_result %}
         <div class="card">
-            <strong>{{ search_result.name }}</strong> - {{ search_result.email }}
+            <strong>{{ search_result[0] }}</strong> - {{ search_result[1] }}
         </div>
     {% else %}
         <p>No contact found matching your query.</p>
@@ -50,7 +50,7 @@
     <h3>Current Contacts (In-Memory)</h3>
     {% for contact in contacts %}
         <div class="card">
-            <strong>{{ contact.name }}</strong> - {{ contact.email }}
+            <strong>{{ contact[0] }}</strong> - {{ contact[1] }}
         </div>
     {% else %}
         <p>No contacts found.</p>
