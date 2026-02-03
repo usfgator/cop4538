@@ -9,6 +9,15 @@ app.config['FLASK_TITLE'] = ""
 # Record the start time when the app starts
 start_time = time.time()
 
+# TODO: Implement undo/redo using two stacks
+# undo_stack stores snapshots of the contact list before each operation
+# redo_stack stores snapshots of the contact list that were undone  
+# Each snapshot must be a python list of contacts (name, email)
+undo_stack = []
+redo_stack = []
+
+
+
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
 # Phase 1: A simple Python List to store contacts
 #contacts = [
@@ -64,6 +73,22 @@ class LinkedList:
         while current:
             yield current.data
             current = current.next
+    #TODO: Add helper methods to:
+    # 1. Convert the linked list to a Python list of contacts (to_list)
+    # 2. Create a linked list from a Python list of contacts (from_list)
+    # These methods will help with undo/redo functionality
+    def to_list(self):
+        result = []
+        current = self.head
+        while current:
+            result.append(list(current.data))
+            current = current.next
+        return result
+    def from_list(self, data_list):
+        self.head = None
+        for data in data_list:
+            self.append(data)
+
 # Initialize linked list with sample contacts   
  
 contacts = LinkedList()
@@ -106,8 +131,11 @@ def add_contact():
     Endpoint to add a new contact.
     Students will update this to insert into their Data Structure.
     """
-    name = request.form.get('name')
-    email = request.form.get('email')
+    name = request.form.get('name', '').strip()
+    email = request.form.get('email', '').strip()
+    # TODO: Before modifying the linked list, push current state to undo_stack and clear redo_stack
+    undo_stack.append(contacts.to_list())
+    redo_stack.clear()
     
     # Phase 1 Logic: Append to list
     contacts.append([name, email])
@@ -154,6 +182,34 @@ def search_contact():
     #                     search_result=result)
 
 
+
+# TODO: Create a flask route for undo operation that:
+# Restores the most recent state from undo_stack
+# Saves the current sate to redo_stack
+# Redirects back to index page
+@app.route('/undo', methods=['POST'])
+def undo():
+    if undo_stack:
+        # Save current state to redo stack
+        redo_stack.append(contacts.to_list())
+        # Restore last state from undo stack
+        last_state = undo_stack.pop()
+        contacts.from_list(last_state)
+    return redirect(url_for('index'))
+
+# TODO: Create a flask route for redo operation that:
+# Restores the most recent state from redo_stack
+# Saves the current sate to undo_stack
+# Redirects back to index page
+@app.route('/redo', methods=['POST'])
+def redo():
+    if redo_stack:
+        # Save current state to undo stack
+        undo_stack.append(contacts.to_list())
+        # Restore last state from redo stack
+        last_state = redo_stack.pop()
+        contacts.from_list(last_state)
+    return redirect(url_for('index'))
 
 
 # --- DATABASE CONNECTIVITY (For later phases) ---

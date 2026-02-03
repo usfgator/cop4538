@@ -47,6 +47,16 @@
         </form>
     </div>
     <hr>
+    <!--TODO: Add undo/redo buttons using forms-->
+    <div style="margin-bottom: 20px;">
+        <form action="/undo" method="POST" style="display: inline;">
+            <button type="submit">Undo</button>
+        </form>
+        <form action="/redo" method="POST" style="display: inline; margin-left: 10px;">
+            <button type="submit">Redo</button>
+        </form>
+    
+    
     <h3>Current Contacts (In-Memory)</h3>
     {% for contact in contacts %}
         <div class="card">
