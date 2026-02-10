@@ -9,13 +9,16 @@ app.config['FLASK_TITLE'] = ""
 # Record the start time when the app starts
 start_time = time.time()
 
-# TODO: Implement undo/redo using two stacks
+# Implement undo/redo using two stacks
 # undo_stack stores snapshots of the contact list before each operation
 # redo_stack stores snapshots of the contact list that were undone  
 # Each snapshot must be a python list of contacts (name, email)
 undo_stack = []
 redo_stack = []
 
+# Create a hash table (dictionary) to store contacts for O(1) search by name
+# The key will be the contact name (lowercased for case-insensitive search)
+contact_dict = {}
 
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
@@ -73,7 +76,7 @@ class LinkedList:
         while current:
             yield current.data
             current = current.next
-    #TODO: Add helper methods to:
+    #Add helper methods to:
     # 1. Convert the linked list to a Python list of contacts (to_list)
     # 2. Create a linked list from a Python list of contacts (from_list)
     # These methods will help with undo/redo functionality
@@ -94,6 +97,13 @@ class LinkedList:
 contacts = LinkedList()
 contacts.append(['Alice', 'alice@example.com'])
 contacts.append(['Bob', 'bob@example.com'])
+
+# Build hash index from linked list for O(1) search
+current = contacts.head 
+while current:
+    name = current.data[0].lower()
+    contact_dict[name] = current.data
+    current = current.next
 
 
 
@@ -122,7 +132,8 @@ def index():
                          contacts=contact_list, 
                          title=app.config['FLASK_TITLE'],
                          elapsed_time=elapsed_time,
-                         search_result=None
+                         search_result=None,
+                         search_query=None
                          )
 
 @app.route('/add', methods=['POST'])
@@ -138,9 +149,31 @@ def add_contact():
     redo_stack.clear()
     
     # Phase 1 Logic: Append to list
-    contacts.append([name, email])
+    #contacts.append([name, email])
+    # Phase 2 Logic: Append to linked list and update hash index
+    new_contact = [name, email]
+    contacts.append(new_contact)
+    contact_dict[name.lower()] = new_contact
+    
     
     return redirect(url_for('index'))
+
+@app.route('/delete', methods=['POST'])
+# Create a flask route for deleting a contact that:
+# 1. Gets the name of the contact to delete from the form
+# 2. Find the full contact using hash table
+# 3. Save current state to undo_stack and clear redo_stack
+# 4. Deletes the contact from the linked list and hash table
+def delete_contact():
+    name = request.form.get('name', '').strip()
+    contact = contact_dict.get(name.lower())
+    if contact:
+        undo_stack.append(contacts.to_list())
+        redo_stack.clear()
+        contacts.delete(contact)
+        contact_dict.pop(name.lower(), None)
+    return redirect(url_for('index'))
+
 
 @app.route('/search')
 def search_contact():
@@ -149,7 +182,7 @@ def search_contact():
         
     # Phase 2 Logic: Search in linked list
     if query:
-        result = contacts.find_by_name(query)
+        result = contact_dict.get(query.lower())
     
     # Convert linked list to a list for rendering
     contact_list = []
@@ -183,7 +216,7 @@ def search_contact():
 
 
 
-# TODO: Create a flask route for undo operation that:
+# Create a flask route for undo operation that:
 # Restores the most recent state from undo_stack
 # Saves the current sate to redo_stack
 # Redirects back to index page
@@ -195,9 +228,16 @@ def undo():
         # Restore last state from undo stack
         last_state = undo_stack.pop()
         contacts.from_list(last_state)
+        # Rebuild hash index after undo
+        contact_dict.clear()
+        current = contacts.head
+        while current:
+            name = current.data[0].lower()
+            contact_dict[name] = current.data
+            current = current.next
     return redirect(url_for('index'))
 
-# TODO: Create a flask route for redo operation that:
+# Create a flask route for redo operation that:
 # Restores the most recent state from redo_stack
 # Saves the current sate to undo_stack
 # Redirects back to index page
@@ -209,6 +249,13 @@ def redo():
         # Restore last state from redo stack
         last_state = redo_stack.pop()
         contacts.from_list(last_state)
+        # Rebuild hash index after redo
+        contact_dict.clear()
+        current = contacts.head
+        while current:
+            name = current.data[0].lower()
+            contact_dict[name] = current.data
+            current = current.next
     return redirect(url_for('index'))
 
 

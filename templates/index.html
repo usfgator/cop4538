@@ -20,7 +20,7 @@
         </form>
     </div>
     <!-- Copilot display search results below the search form and add logic to handle search result = None -->
-    {% if search_query %}
+    {% if search_query is not none%}
     <h3>Search Results</h3>
     {% if search_result %}
         <div class="card">
@@ -47,7 +47,7 @@
         </form>
     </div>
     <hr>
-    <!--TODO: Add undo/redo buttons using forms-->
+    <!--Add undo/redo buttons using forms-->
     <div style="margin-bottom: 20px;">
         <form action="/undo" method="POST" style="display: inline;">
             <button type="submit">Undo</button>
@@ -56,11 +56,15 @@
             <button type="submit">Redo</button>
         </form>
     
-    
+    </div>
     <h3>Current Contacts (In-Memory)</h3>
     {% for contact in contacts %}
         <div class="card">
             <strong>{{ contact[0] }}</strong> - {{ contact[1] }}
+            <form action="/delete" method="POST" style="display: inline; margin-left: 10px;">
+                <input type="hidden" name="name" value="{{ contact[0] }}">
+                <button type="submit">Delete</button>
+            </form>
         </div>
     {% else %}
         <p>No contacts found.</p>
