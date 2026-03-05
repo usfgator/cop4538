@@ -1,73 +1,319 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>{{ title }}Contact Manager</title>
-    <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
-    </style>
+
+<title>{{ title }}Contact Manager</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:sans-serif;
+max-width:1100px;
+margin:0 auto;
+padding:20px;
+}
+
+.section{
+background:#f5f5f5;
+padding:15px;
+margin-bottom:20px;
+}
+
+.card{
+border:1px solid #ddd;
+padding:10px;
+margin-bottom:10px;
+}
+
+.container{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:20px;
+}
+
+.contact-list{
+max-height:420px;
+overflow-y:auto;
+}
+
+table{
+border-collapse:collapse;
+width:100%;
+margin-top:10px;
+}
+
+th,td{
+padding:8px;
+border:1px solid #ccc;
+text-align:left;
+}
+
+button{
+padding:6px 10px;
+cursor:pointer;
+}
+
+@media (max-width:900px){
+
+.container{
+grid-template-columns:1fr;
+}
+
+.contact-list{
+max-height:none;
+}
+
+}
+
+</style>
+
 </head>
+
+
 <body>
-    <h1>{{ title }}Harrison's Contact Manager</h1>
-    
-    <p>App has been running for: {{ "%.2f"|format(elapsed_time) }} seconds</p>
-    <!-- Copilot, create a form with a text input named "query" and a "Search" button  -->
-    <div style="background-color: #e0e0e0; padding: 15px; margin-bottom: 20px;">
-        <h3>Search Contacts</h3>
-        <form action="/search" method="GET">
-            <input type="text" name="query" placeholder="Search by name" required>
-            <button type="submit">Search</button>
-        </form>
-    </div>
-    <!-- Copilot display search results below the search form and add logic to handle search result = None -->
-    {% if search_query is not none%}
-    <h3>Search Results</h3>
-    {% if search_result %}
-        <div class="card">
-            <strong>{{ search_result[0] }}</strong> - {{ search_result[1] }}
-        </div>
-    {% else %}
-        <p>No contact found matching your query.</p>
-    {% endif %}
-    <hr>
-    {% endif %}
+
+<h1>{{ title }}Harrison's Contact Manager</h1>
+
+<p>App has been running for: {{ "%.2f"|format(elapsed_time) }} seconds</p>
+
+
+<div class="section">
+
+<h3>Search Contacts</h3>
+
+<form action="/search" method="GET">
+
+<input type="text" name="query" placeholder="Search by name" required>
+
+<button type="submit">Search</button>
+
+</form>
+
+</div>
+
+
+{% if search_query is not none %}
+
+<h3>Search Results</h3>
+
+{% if search_result %}
+
+<div class="card">
+
+<strong>{{ search_result[0] }}</strong> - {{ search_result[1] }}
+
+</div>
+
+{% else %}
+
+<p>No contact found matching your query.</p>
+
+{% endif %}
+
+<hr>
+
+{% endif %}
 
 
 
+<div class="section">
+
+<h3>Add New Contact</h3>
+
+<form action="/add" method="POST">
+
+<input type="text" name="name" placeholder="Name" required>
+
+<input type="email" name="email" placeholder="Email" required>
+
+<button type="submit">Add to Data Structure</button>
+
+</form>
+
+</div>
 
 
-    
+<div style="margin-bottom:20px;">
 
-    <div style="background-color: #f0f0f0; padding: 15px;">
-        <h3>Add New Contact</h3>
-        <form action="/add" method="POST">
-            <input type="text" name="name" placeholder="Name" required>
-            <input type="email" name="email" placeholder="Email" required>
-            <button type="submit">Add to Data Structure</button>
-        </form>
-    </div>
-    <hr>
-    <!--Add undo/redo buttons using forms-->
-    <div style="margin-bottom: 20px;">
-        <form action="/undo" method="POST" style="display: inline;">
-            <button type="submit">Undo</button>
-        </form>
-        <form action="/redo" method="POST" style="display: inline; margin-left: 10px;">
-            <button type="submit">Redo</button>
-        </form>
-    
-    </div>
-    <h3>Current Contacts (In-Memory)</h3>
-    {% for contact in contacts %}
-        <div class="card">
-            <strong>{{ contact[0] }}</strong> - {{ contact[1] }}
-            <form action="/delete" method="POST" style="display: inline; margin-left: 10px;">
-                <input type="hidden" name="name" value="{{ contact[0] }}">
-                <button type="submit">Delete</button>
-            </form>
-        </div>
-    {% else %}
-        <p>No contacts found.</p>
-    {% endfor %}
+<form action="/undo" method="POST" style="display:inline;">
+
+<button type="submit">Undo</button>
+
+</form>
+
+<form action="/redo" method="POST" style="display:inline;margin-left:10px;">
+
+<button type="submit">Redo</button>
+
+</form>
+
+<form action="/benchmark" method="POST" style="display:inline;margin-left:20px;">
+
+<button type="submit">Run Search Benchmark</button>
+
+</form>
+
+</div>
+
+
+
+<div class="container">
+
+<div>
+
+<h3>Current Contacts (In-Memory)</h3>
+
+<p><strong>Total Contacts:</strong> {{ contacts|length }}</p>
+
+<div class="contact-list">
+
+{% for contact in contacts %}
+
+<div class="card">
+
+<strong>{{ contact[0] }}</strong> - {{ contact[1] }}
+
+<form action="/delete" method="POST" style="display:inline;margin-left:10px;">
+
+<input type="hidden" name="name" value="{{ contact[0] }}">
+
+<button type="submit">Delete</button>
+
+</form>
+
+</div>
+
+{% else %}
+
+<p>No contacts found.</p>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+
+
+<div>
+
+{% if benchmark_results is defined %}
+
+<h2>Search Benchmark Results</h2>
+
+<p>This benchmark compares <strong>Linear Search O(n)</strong> vs <strong>Binary Search O(log n)</strong>.</p>
+
+<p><strong>Dataset sizes tested:</strong> 100, 1000, 5000</p>
+
+<table>
+
+<tr>
+
+<th>Dataset Size</th>
+
+<th>Linear Search Time</th>
+
+<th>Binary Search Time</th>
+
+</tr>
+
+{% for row in benchmark_results %}
+
+<tr>
+
+<td>{{ row.size }}</td>
+
+<td>{{ "%.6f"|format(row.linear) }}</td>
+
+<td>{{ "%.6f"|format(row.binary) }}</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+
+<h3>Search Performance Graph</h3>
+
+<canvas id="benchmarkChart"></canvas>
+
+
+<script>
+
+const benchmarkData = {{ benchmark_results | tojson }};
+
+const sizes = benchmarkData.map(x => x.size);
+
+const linear = benchmarkData.map(x => x.linear);
+
+const binary = benchmarkData.map(x => x.binary);
+
+
+const ctx = document.getElementById('benchmarkChart').getContext('2d');
+
+new Chart(ctx,{
+
+type:'line',
+
+data:{
+labels:sizes,
+
+datasets:[
+
+{
+label:'Linear Search O(n)',
+data:linear,
+borderColor:'red',
+fill:false
+},
+
+{
+label:'Binary Search O(log n)',
+data:binary,
+borderColor:'green',
+fill:false
+}
+
+]
+
+},
+
+options:{
+responsive:true,
+plugins:{
+legend:{position:'top'}
+},
+scales:{
+x:{
+title:{
+display:true,
+text:'Dataset Size'
+}
+},
+y:{
+title:{
+display:true,
+text:'Execution Time (seconds)'
+}
+}
+}
+
+}
+
+});
+
+</script>
+
+{% endif %}
+
+</div>
+
+</div>
+
 </body>
+
 </html>

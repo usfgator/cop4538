@@ -1,3 +1,5 @@
+from collections import deque
+from benchmark import run_benchmark
 from flask import Flask, render_template, request, redirect, url_for
 import os
 import time
@@ -9,25 +11,26 @@ app.config['FLASK_TITLE'] = ""
 # Record the start time when the app starts
 start_time = time.time()
 
-# Implement undo/redo using two stacks
+# Implement undo/redo using a stack for undo and a queue for redo (FIFO).
+# Each operation (add/delete) will push the current state of the contact list onto the undo stack
+# before modifying it. When undoing, we pop from the undo stack and enqueue the current state onto
+# the redo queue. When redoing, we dequeue from the redo queue and push the current state back onto
+# the undo stack.
 # undo_stack stores snapshots of the contact list before each operation
-# redo_stack stores snapshots of the contact list that were undone  
+# redo_queue stores snapshots of the contact list that were undone
 # Each snapshot must be a python list of contacts (name, email)
 undo_stack = []
-redo_stack = []
+redo_queue = deque()  # Using deque for efficient FIFO operations in redo functionality
 
 # Create a hash table (dictionary) to store contacts for O(1) search by name
 # The key will be the contact name (lowercased for case-insensitive search)
+# We will maintain this hash table in sync with the linked list to allow for efficient lookups and deletions.
+# We will use quick sort and binary search for searching contacts, but the hash table will still be useful for O(1) lookups during add/delete operations and for building the sorted list for display.
+
 contact_dict = {}
 
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
-# Phase 1: A simple Python List to store contacts
-#contacts = [
-#    ['alice', 'alice@example.com'],
-#    ['bob', 'bob@example.com']
-#]
-
 
 # Phase 2: Linked List implementation
 class Node:
@@ -105,6 +108,63 @@ while current:
     contact_dict[name] = current.data
     current = current.next
 
+# Implement Quick Sort to sort contacts alphabetically by name.
+# The input will be a Python list of contacts where each contact is
+# stored as [name, email].
+# Quick Sort will:
+# 1. Choose a pivot element
+# 2. Partition contacts into three lists (less, equal, greater)
+#    based on alphabetical comparison of the name field.
+# 3. Recursively sort the left and right partitions.
+# 4. Return the combined sorted list.
+#
+# This function will be used before performing binary search,
+# since binary search requires the data to be sorted.
+def quick_sort(contacts):
+    if len(contacts) <= 1:
+        return contacts
+    pivot = contacts[len(contacts) // 2][0].lower()  # Use name as pivot
+    left = [x for x in contacts if x[0].lower() < pivot]
+    middle = [x for x in contacts if x[0].lower() == pivot]
+    right = [x for x in contacts if x[0].lower() > pivot]
+    return quick_sort(left) + middle + quick_sort(right)
+# Implement binary search to find a contact by name in a sorted list.
+# The input will be a sorted list of contacts where each contact is
+# stored as [name, email].
+#
+# The algorithm should follow the lecture pattern:
+# 1. Set low = 0
+# 2. Set high = len(list) - 1
+# 3. While low <= high:
+#       mid = (low + high) // 2
+#       compare the name at mid with the target name
+# 4. If equal, return the contact
+# 5. If target is smaller, search left half
+# 6. If target is larger, search right half
+# 7. If not found, return None
+#
+# This function will be used after quick_sort() to perform efficient searching.
+def binary_search(contacts, target_name):
+    low = 0
+    high = len(contacts) - 1
+    target_name = target_name.lower()
+    
+    while low <= high:
+        mid = (low + high) // 2
+        mid_name = contacts[mid][0].lower()
+        
+        if mid_name == target_name:
+            return contacts[mid]  # Contact found
+        elif mid_name < target_name:
+            low = mid + 1  # Search right half
+        else:
+            high = mid - 1  # Search left half
+            
+    return None  # Contact not found
+
+
+
+
 
 
 # --- ROUTES ---
@@ -120,14 +180,13 @@ def index():
 
     # Calculate elapsed time since app start
     elapsed_time = time.time() - start_time
-    # Convert linked list to a list for rendering
-    contact_list = []
-    current = contacts.head
-    while current:
-        contact_list.append(current.data)
-        current = current.next
-    
 
+    # Use QuickSort to display contacts alphabetically on the main page.
+    # Convert the LinkedList into a Python list using contacts.to_list(),
+    # then sort the list using quick_sort() before rendering the template.
+    contact_list = contacts.to_list()    
+    contact_list = quick_sort(contact_list)
+    
     return render_template('index.html', 
                          contacts=contact_list, 
                          title=app.config['FLASK_TITLE'],
@@ -137,6 +196,9 @@ def index():
                          )
 
 @app.route('/add', methods=['POST'])
+# Any time the user performs a new operation (add/delete), clear the redo queue.
+# This prevents redoing states that no longer make sense after new edits.
+# Replace any redo_stack.clear() calls with redo_queue.clear().
 def add_contact():
     """
     Endpoint to add a new contact.
@@ -146,7 +208,7 @@ def add_contact():
     email = request.form.get('email', '').strip()
     # TODO: Before modifying the linked list, push current state to undo_stack and clear redo_stack
     undo_stack.append(contacts.to_list())
-    redo_stack.clear()
+    redo_queue.clear()
     
     # Phase 1 Logic: Append to list
     #contacts.append([name, email])
@@ -164,70 +226,68 @@ def add_contact():
 # 2. Find the full contact using hash table
 # 3. Save current state to undo_stack and clear redo_stack
 # 4. Deletes the contact from the linked list and hash table
+# Any time the user performs a new operation (add/delete), clear the redo queue.
+# This prevents redoing states that no longer make sense after new edits.
+# Replace any redo_stack.clear() calls with redo_queue.clear().
 def delete_contact():
     name = request.form.get('name', '').strip()
     contact = contact_dict.get(name.lower())
     if contact:
         undo_stack.append(contacts.to_list())
-        redo_stack.clear()
+        redo_queue.clear()
         contacts.delete(contact)
         contact_dict.pop(name.lower(), None)
     return redirect(url_for('index'))
 
-
+# Replace the current hash-table search with QuickSort + Binary Search.
+# The search process should follow these steps:
+# 1. Convert the LinkedList of contacts into a Python list using contacts.to_list().
+# 2. Sort the list alphabetically using quick_sort().
+# 3. Use binary_search() to locate the target contact.
+# 4. Return the found contact (or None if not found).
+# 5. Render the sorted list so the UI displays contacts in alphabetical order.
 @app.route('/search')
 def search_contact():
     query = request.args.get('query', '').strip()
     result = None
-        
-    # Phase 2 Logic: Search in linked list
+
+    # Step 1: Convert LinkedList to Python list
+    contact_list = contacts.to_list()
+
+    # Step 2: Sort using QuickSort
+    sorted_contacts = quick_sort(contact_list)
+
+    # Step 3: Binary search
     if query:
-        result = contact_dict.get(query.lower())
-    
-    # Convert linked list to a list for rendering
-    contact_list = []
-    current = contacts.head
-    while current:
-        contact_list.append(current.data)
-        current = current.next
-    return render_template('index.html', 
-                         contacts=contact_list, 
-                         title=app.config['FLASK_TITLE'],
-                         elapsed_time=time.time() - start_time,
-                         search_result=result,
-                         search_query=query
-                        )
+        result = binary_search(sorted_contacts, query)
 
-    
-    # Phase 1 Logic: Search in list
-    #def find(query):
-    #    for contact in contacts:
-    #        if contact[0].lower() == query.lower():
-    #            return contact
-    #    return None
-    #result = find(query)
-
-    
-    #return render_template('index.html', 
-    #                     contacts=contacts, 
-    #                     title=app.config['FLASK_TITLE'],
-    #                     elapsed_time=time.time() - start_time,
-    #                     search_result=result)
-
-
-
+    return render_template(
+        'index.html',
+        contacts=sorted_contacts,
+        title=app.config['FLASK_TITLE'],
+        elapsed_time=time.time() - start_time,
+        search_result=result,
+        search_query=query
+    )   
+ 
 # Create a flask route for undo operation that:
 # Restores the most recent state from undo_stack
-# Saves the current sate to redo_stack
+# Saves the current sate to redo_queue
 # Redirects back to index page
+# Update undo() to use redo_queue (FIFO):
+# - If undo_stack is not empty, enqueue the current contacts snapshot onto redo_queue
+# - Pop the last snapshot from undo_stack and restore it into the linked list
+# - Rebuild the hash table index (contact_dict) after restoring
 @app.route('/undo', methods=['POST'])
 def undo():
     if undo_stack:
-        # Save current state to redo stack
-        redo_stack.append(contacts.to_list())
-        # Restore last state from undo stack
+        # Save current state to redo queue (FIFO)
+        redo_queue.append(contacts.to_list())
+
+        # Restore last state from undo stack (LIFO)
         last_state = undo_stack.pop()
         contacts.from_list(last_state)
+
         # Rebuild hash index after undo
         contact_dict.clear()
         current = contacts.head
@@ -235,20 +295,27 @@ def undo():
             name = current.data[0].lower()
             contact_dict[name] = current.data
             current = current.next
+
     return redirect(url_for('index'))
 
 # Create a flask route for redo operation that:
-# Restores the most recent state from redo_stack
+# Restores the most recent state from redo_queue
 # Saves the current sate to undo_stack
 # Redirects back to index page
+# Update redo() to use redo_queue (FIFO):
+# - If redo_queue is not empty, push the current contacts snapshot onto undo_stack
+# - Dequeue (popleft) the oldest snapshot from redo_queue and restore it
+# - Rebuild the hash table index (contact_dict) after restoring
 @app.route('/redo', methods=['POST'])
 def redo():
-    if redo_stack:
+    if redo_queue:
         # Save current state to undo stack
         undo_stack.append(contacts.to_list())
-        # Restore last state from redo stack
-        last_state = redo_stack.pop()
-        contacts.from_list(last_state)
+
+        # Restore the oldest undone state (FIFO)
+        next_state = redo_queue.popleft()
+        contacts.from_list(next_state)
+
         # Rebuild hash index after redo
         contact_dict.clear()
         current = contacts.head
@@ -256,7 +323,25 @@ def redo():
             name = current.data[0].lower()
             contact_dict[name] = current.data
             current = current.next
+
     return redirect(url_for('index'))
+
+# Create a Flask route that runs the search benchmark using the
+# run_benchmark() function from benchmark.py. The results should
+# be returned to the index template so they can be displayed in
+# the GUI as a benchmark table.
+@app.route('/benchmark', methods=['POST'])
+def benchmark():
+    results = run_benchmark()
+    return render_template('index.html', 
+                         contacts=contacts.to_list(), 
+                         title=app.config['FLASK_TITLE'],
+                         elapsed_time=time.time() - start_time,
+                         search_result=None,
+                         search_query=None,
+                         benchmark_results=results
+                         )
+
 
 
 # --- DATABASE CONNECTIVITY (For later phases) ---
