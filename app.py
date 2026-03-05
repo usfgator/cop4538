@@ -162,7 +162,8 @@ def binary_search(contacts, target_name):
             
     return None  # Contact not found
 
-
+def find_contact_by_id(contacts, target_name):
+    return binary_search(contacts, target_name)
 
 
 
