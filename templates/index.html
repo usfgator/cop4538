@@ -86,7 +86,7 @@ max-height:none;
 
 <form action="/search" method="GET">
 
-<input type="text" name="query" placeholder="Search by name" required>
+<input type="number" name="query" placeholder="Search by ID" required>
 
 <button type="submit">Search</button>
 
@@ -103,7 +103,7 @@ max-height:none;
 
 <div class="card">
 
-<strong>{{ search_result[0] }}</strong> - {{ search_result[1] }}
+<strong>{{ search_result[0] }}</strong> - {{ search_result[1] }} - {{ search_result[2] }}
 
 </div>
 
@@ -174,13 +174,13 @@ max-height:none;
 
 <div class="card">
 
-<strong>{{ contact[0] }}</strong> - {{ contact[1] }}
+<strong>{{ contact[0] }}</strong> - {{ contact[1] }} - {{ contact[2] }}
 
 <form action="/delete" method="POST" style="display:inline;margin-left:10px;">
 
-<input type="hidden" name="name" value="{{ contact[0] }}">
+<input type="hidden" name="id" value="{{ contact[0] }}">
 
-<button type="submit">Delete</button>
+<button type="submit">Delete Contact</button>
 
 </form>
 

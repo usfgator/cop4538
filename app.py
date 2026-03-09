@@ -18,9 +18,9 @@ start_time = time.time()
 # the undo stack.
 # undo_stack stores snapshots of the contact list before each operation
 # redo_queue stores snapshots of the contact list that were undone
-# Each snapshot must be a python list of contacts (name, email)
+# Each snapshot must be a python list of contacts (ID, name, email)
 undo_stack = []
-redo_queue = deque()  # Using deque for efficient FIFO operations in redo functionality
+redo_queue = deque()
 
 # Create a hash table (dictionary) to store contacts for O(1) search by name
 # The key will be the contact name (lowercased for case-insensitive search)
@@ -28,6 +28,8 @@ redo_queue = deque()  # Using deque for efficient FIFO operations in redo functi
 # We will use quick sort and binary search for searching contacts, but the hash table will still be useful for O(1) lookups during add/delete operations and for building the sorted list for display.
 
 contact_dict = {}
+next_contact_id = 3  # This will be used to assign unique IDs to contacts if needed in the future
+
 
 
 # --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
@@ -70,7 +72,7 @@ class LinkedList:
     def find_by_name(self, name):
         current = self.head
         while current:
-            if current.data[0].lower() == name.lower():
+            if current.data[1].lower() == name.lower():
                 return current.data
             current = current.next
         return None 
@@ -95,22 +97,22 @@ class LinkedList:
         for data in data_list:
             self.append(data)
 
-# Initialize linked list with sample contacts   
+# Initialize linked list with sample contacts; add ID field to each contact for better tracking and searching 
  
 contacts = LinkedList()
-contacts.append(['Alice', 'alice@example.com'])
-contacts.append(['Bob', 'bob@example.com'])
+contacts.append([1, 'Alice', 'alice@example.com'])
+contacts.append([2, 'Bob', 'bob@example.com'])
 
 # Build hash index from linked list for O(1) search
 current = contacts.head 
 while current:
-    name = current.data[0].lower()
+    name = current.data[1].lower()
     contact_dict[name] = current.data
     current = current.next
 
 # Implement Quick Sort to sort contacts alphabetically by name.
 # The input will be a Python list of contacts where each contact is
-# stored as [name, email].
+# stored as [ID, name, email].
 # Quick Sort will:
 # 1. Choose a pivot element
 # 2. Partition contacts into three lists (less, equal, greater)
@@ -123,14 +125,14 @@ while current:
 def quick_sort(contacts):
     if len(contacts) <= 1:
         return contacts
-    pivot = contacts[len(contacts) // 2][0].lower()  # Use name as pivot
-    left = [x for x in contacts if x[0].lower() < pivot]
-    middle = [x for x in contacts if x[0].lower() == pivot]
-    right = [x for x in contacts if x[0].lower() > pivot]
+    pivot = contacts[len(contacts) // 2][0]
+    left = [x for x in contacts if x[0] < pivot]
+    middle = [x for x in contacts if x[0] == pivot]
+    right = [x for x in contacts if x[0] > pivot]
     return quick_sort(left) + middle + quick_sort(right)
 # Implement binary search to find a contact by name in a sorted list.
 # The input will be a sorted list of contacts where each contact is
-# stored as [name, email].
+# stored as [ID, name, email].
 #
 # The algorithm should follow the lecture pattern:
 # 1. Set low = 0
@@ -144,28 +146,22 @@ def quick_sort(contacts):
 # 7. If not found, return None
 #
 # This function will be used after quick_sort() to perform efficient searching.
-def binary_search(contacts, target_name):
+def binary_search(contacts, target_id):
     low = 0
     high = len(contacts) - 1
-    target_name = target_name.lower()
-    
     while low <= high:
         mid = (low + high) // 2
-        mid_name = contacts[mid][0].lower()
-        
-        if mid_name == target_name:
-            return contacts[mid]  # Contact found
-        elif mid_name < target_name:
-            low = mid + 1  # Search right half
+        mid_id = contacts[mid][0]
+        if mid_id == target_id:
+            return contacts[mid]
+        elif mid_id < target_id:
+            low = mid + 1
         else:
-            high = mid - 1  # Search left half
-            
-    return None  # Contact not found
+            high = mid - 1
+    return None
 
-def find_contact_by_id(contacts, target_name):
-    return binary_search(contacts, target_name)
-
-
+def find_contact_by_id(contacts_list, target_id):
+    return binary_search(contacts_list, target_id)
 
 
 # --- ROUTES ---
@@ -177,7 +173,7 @@ def index():
     Eventually, students will pass their Linked List or Tree data here.
     """
     # Change Flask HTMLtitle to my name
-    app.config['FLASK_TITLE'] = "Harrison's Contact List"
+    app.config['FLASK_TITLE'] = ""
 
     # Calculate elapsed time since app start
     elapsed_time = time.time() - start_time
@@ -214,14 +210,15 @@ def add_contact():
     # Phase 1 Logic: Append to list
     #contacts.append([name, email])
     # Phase 2 Logic: Append to linked list and update hash index
-    new_contact = [name, email]
+    global next_contact_id
+    new_contact = [next_contact_id, name, email]
     contacts.append(new_contact)
     contact_dict[name.lower()] = new_contact
-    
+    next_contact_id += 1
     
     return redirect(url_for('index'))
 
-@app.route('/delete', methods=['POST'])
+
 # Create a flask route for deleting a contact that:
 # 1. Gets the name of the contact to delete from the form
 # 2. Find the full contact using hash table
@@ -230,14 +227,30 @@ def add_contact():
 # Any time the user performs a new operation (add/delete), clear the redo queue.
 # This prevents redoing states that no longer make sense after new edits.
 # Replace any redo_stack.clear() calls with redo_queue.clear().
+@app.route('/delete', methods=['POST'])
 def delete_contact():
-    name = request.form.get('name', '').strip()
-    contact = contact_dict.get(name.lower())
+
+    contact_id = int(request.form.get('id'))
+
+    # find the contact with matching ID
+    contact = None
+    current = contacts.head
+
+    while current:
+        if current.data[0] == contact_id:
+            contact = current.data
+            break
+        current = current.next
+
     if contact:
         undo_stack.append(contacts.to_list())
         redo_queue.clear()
+
         contacts.delete(contact)
-        contact_dict.pop(name.lower(), None)
+
+        # remove from hash table using name
+        contact_dict.pop(contact[1].lower(), None)
+
     return redirect(url_for('index'))
 
 # Replace the current hash-table search with QuickSort + Binary Search.
@@ -260,7 +273,7 @@ def search_contact():
 
     # Step 3: Binary search
     if query:
-        result = binary_search(sorted_contacts, query)
+        result = find_contact_by_id(sorted_contacts, int(query))
 
     return render_template(
         'index.html',
@@ -293,7 +306,7 @@ def undo():
         contact_dict.clear()
         current = contacts.head
         while current:
-            name = current.data[0].lower()
+            name = current.data[1].lower()
             contact_dict[name] = current.data
             current = current.next
 
@@ -321,7 +334,7 @@ def redo():
         contact_dict.clear()
         current = contacts.head
         while current:
-            name = current.data[0].lower()
+            name = current.data[1].lower()
             contact_dict[name] = current.data
             current = current.next
 
@@ -333,15 +346,21 @@ def redo():
 # the GUI as a benchmark table.
 @app.route('/benchmark', methods=['POST'])
 def benchmark():
+
     results = run_benchmark()
-    return render_template('index.html', 
-                         contacts=contacts.to_list(), 
-                         title=app.config['FLASK_TITLE'],
-                         elapsed_time=time.time() - start_time,
-                         search_result=None,
-                         search_query=None,
-                         benchmark_results=results
-                         )
+
+    contact_list = contacts.to_list()
+    contact_list = quick_sort(contact_list)
+
+    return render_template(
+        'index.html',
+        contacts=contact_list,
+        title=app.config['FLASK_TITLE'],
+        elapsed_time=time.time() - start_time,
+        search_result=None,
+        search_query=None,
+        benchmark_results=results
+    )
 
 
 
