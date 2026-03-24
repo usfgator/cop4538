@@ -1,45 +1,34 @@
 from collections import deque
 from benchmark import run_benchmark
 from flask import Flask, render_template, request, redirect, url_for
-import os
 import time
+import heapq
 
 app = Flask(__name__)
-
 app.config['FLASK_TITLE'] = ""
- 
-# Record the start time when the app starts
+
 start_time = time.time()
 
-# Implement undo/redo using a stack for undo and a queue for redo (FIFO).
-# Each operation (add/delete) will push the current state of the contact list onto the undo stack
-# before modifying it. When undoing, we pop from the undo stack and enqueue the current state onto
-# the redo queue. When redoing, we dequeue from the redo queue and push the current state back onto
-# the undo stack.
-# undo_stack stores snapshots of the contact list before each operation
-# redo_queue stores snapshots of the contact list that were undone
-# Each snapshot must be a python list of contacts (ID, name, email)
+# Initial data structures for undo/redo
 undo_stack = []
 redo_queue = deque()
 
-# Create a hash table (dictionary) to store contacts for O(1) search by name
-# The key will be the contact name (lowercased for case-insensitive search)
-# We will maintain this hash table in sync with the linked list to allow for efficient lookups and deletions.
-# We will use quick sort and binary search for searching contacts, but the hash table will still be useful for O(1) lookups during add/delete operations and for building the sorted list for display.
-
+# Hash table for O(1) lookups
 contact_dict = {}
-next_contact_id = 3  # This will be used to assign unique IDs to contacts if needed in the future
+next_contact_id = 3
 
-
-
-# --- IN-MEMORY DATA STRUCTURES (Students will modify this area) ---
-
-# Phase 2: Linked List implementation
+# Copilot Prompt:
+# Create a Node class for a singly linked list to store contacts.
+# Each node should store contact data (id, name, email, category)
+# and a reference to the next node in the list.
 class Node:
     def __init__(self, data):
         self.data = data
         self.next = None
-
+# Copilot Prompt:
+# Implement a singly linked list to store contacts.
+# Each contact should be stored as [id, name, email, category].
+# Include methods for append, delete by ID, traversal, and conversion to/from a Python list.
 class LinkedList:
     def __init__(self):
         self.head = None
@@ -53,38 +42,20 @@ class LinkedList:
         while last.next:
             last = last.next
         last.next = new_node
+
     def delete(self, key):
         temp = self.head
-        if temp is not None:
-            if temp.data == key:
-                self.head = temp.next
-                temp = None
+        prev = None
+        while temp:
+            if temp.data[0] == key[0]:
+                if prev:
+                    prev.next = temp.next
+                else:
+                    self.head = temp.next
                 return
-        while temp is not None:
-            if temp.data == key:
-                break
             prev = temp
             temp = temp.next
-        if temp is None:
-            return
-        prev.next = temp.next
-        temp = None
-    def find_by_name(self, name):
-        current = self.head
-        while current:
-            if current.data[1].lower() == name.lower():
-                return current.data
-            current = current.next
-        return None 
-    def __iter__(self):
-        current = self.head
-        while current:
-            yield current.data
-            current = current.next
-    #Add helper methods to:
-    # 1. Convert the linked list to a Python list of contacts (to_list)
-    # 2. Create a linked list from a Python list of contacts (from_list)
-    # These methods will help with undo/redo functionality
+
     def to_list(self):
         result = []
         current = self.head
@@ -92,286 +63,355 @@ class LinkedList:
             result.append(list(current.data))
             current = current.next
         return result
+
     def from_list(self, data_list):
         self.head = None
         for data in data_list:
             self.append(data)
 
-# Initialize linked list with sample contacts; add ID field to each contact for better tracking and searching 
- 
-contacts = LinkedList()
-contacts.append([1, 'Alice', 'alice@example.com'])
-contacts.append([2, 'Bob', 'bob@example.com'])
 
-# Build hash index from linked list for O(1) search
-current = contacts.head 
+contacts = LinkedList()
+contacts.append([1, 'Alice', 'alice@example.com', 'Personal'])
+contacts.append([2, 'Bob', 'bob@example.com', 'Work'])
+
+# Copilot Prompt:
+# Use a Python dictionary as a hash table to map contact IDs to contact records.
+# This enables O(1) lookup when retrieving or deleting contacts.
+current = contacts.head
 while current:
-    name = current.data[1].lower()
-    contact_dict[name] = current.data
+    contact_dict[current.data[0]] = current.data
     current = current.next
 
-# Implement Quick Sort to sort contacts alphabetically by name.
-# The input will be a Python list of contacts where each contact is
-# stored as [ID, name, email].
-# Quick Sort will:
-# 1. Choose a pivot element
-# 2. Partition contacts into three lists (less, equal, greater)
-#    based on alphabetical comparison of the name field.
-# 3. Recursively sort the left and right partitions.
-# 4. Return the combined sorted list.
-#
-# This function will be used before performing binary search,
-# since binary search requires the data to be sorted.
-def quick_sort(contacts):
-    if len(contacts) <= 1:
-        return contacts
-    pivot = contacts[len(contacts) // 2][0]
-    left = [x for x in contacts if x[0] < pivot]
-    middle = [x for x in contacts if x[0] == pivot]
-    right = [x for x in contacts if x[0] > pivot]
-    return quick_sort(left) + middle + quick_sort(right)
-# Implement binary search to find a contact by name in a sorted list.
-# The input will be a sorted list of contacts where each contact is
-# stored as [ID, name, email].
-#
-# The algorithm should follow the lecture pattern:
-# 1. Set low = 0
-# 2. Set high = len(list) - 1
-# 3. While low <= high:
-#       mid = (low + high) // 2
-#       compare the name at mid with the target name
-# 4. If equal, return the contact
-# 5. If target is smaller, search left half
-# 6. If target is larger, search right half
-# 7. If not found, return None
-#
-# This function will be used after quick_sort() to perform efficient searching.
-def binary_search(contacts, target_id):
-    low = 0
-    high = len(contacts) - 1
+
+# Copilot Prompt:
+# Implement QuickSort to sort contacts by ID.
+# Use a divide-and-conquer approach with a pivot,
+# and recursively sort left and right partitions.
+def quick_sort(data):
+    if len(data) <= 1:
+        return data
+    pivot = data[len(data)//2][0]
+    left = [x for x in data if x[0] < pivot]
+    mid = [x for x in data if x[0] == pivot]
+    right = [x for x in data if x[0] > pivot]
+    return quick_sort(left) + mid + quick_sort(right)
+
+# Copilot Prompt:
+# Implement binary search to efficiently find a contact by ID
+# in a sorted list of contacts.
+# The function should return the matching contact or None.
+def binary_search(data, target):
+    low, high = 0, len(data)-1
     while low <= high:
-        mid = (low + high) // 2
-        mid_id = contacts[mid][0]
-        if mid_id == target_id:
-            return contacts[mid]
-        elif mid_id < target_id:
+        mid = (low + high)//2
+        if data[mid][0] == target:
+            return data[mid]
+        elif data[mid][0] < target:
             low = mid + 1
         else:
             high = mid - 1
     return None
 
-def find_contact_by_id(contacts_list, target_id):
-    return binary_search(contacts_list, target_id)
+def find_contact_by_id(data, target):
+    return binary_search(data, target)
+
+# Copilot Prompt:
+# Create a TreeNode class to represent hierarchical categories.
+# Each node should store a category name, a list of contacts,
+# and references to child categories.
+class TreeNode:
+    def __init__(self, value):
+        self.value = value
+        self.children = []
+        self.contacts = []
+
+    def add_child(self, node):
+        self.children.append(node)
+
+    def add_contact(self, contact):
+        if not any(c[0] == contact[0] for c in self.contacts):
+            self.contacts.append(contact)
+
+    def remove_contact(self, contact):
+        self.contacts = [c for c in self.contacts if c[0] != contact[0]]
+
+    def clear_contacts_recursive(self):
+        self.contacts = []
+        for child in self.children:
+            child.clear_contacts_recursive()
+
+    def find(self, value):
+        if self.value.lower() == value.lower():
+            return self
+        for child in self.children:
+            result = child.find(value)
+            if result:
+                return result
+        return None
+
+# Copilot Prompt:
+# Implement a CategoryTree class with a root node called "Contacts".
+# Provide methods to find categories recursively and add new categories
+# under a given parent node.
+class CategoryTree:
+    def __init__(self):
+        self.root = TreeNode("Contacts")
+
+    def get_category(self, name):
+        return self.root.find(name)
+
+    def add_category(self, parent, name):
+        parent_node = self.get_category(parent)
+        if not parent_node:
+            return None
+        node = TreeNode(name)
+        parent_node.add_child(node)
+        return node
 
 
-# --- ROUTES ---
+# Copilot Prompt:
+# Create a BSTNode class to store category names as keys
+# and references to TreeNode objects as values.
+# Each node should support left and right children.
+class BSTNode:
+    def __init__(self, key, value):
+        self.key = key.lower()
+        self.value = value
+        self.left = None
+        self.right = None
 
-@app.route('/')
-def index():
-    """
-    Displays the main page.
-    Eventually, students will pass their Linked List or Tree data here.
-    """
-    # Change Flask HTMLtitle to my name
-    app.config['FLASK_TITLE'] = ""
+    def insert(self, key, value):
+        key = key.lower()
+        if key < self.key:
+            if self.left:
+                self.left.insert(key, value)
+            else:
+                self.left = BSTNode(key, value)
+        elif key > self.key:
+            if self.right:
+                self.right.insert(key, value)
+            else:
+                self.right = BSTNode(key, value)
 
-    # Calculate elapsed time since app start
-    elapsed_time = time.time() - start_time
+    def search(self, key):
+        key = key.lower()
+        if key == self.key:
+            return self.value
+        elif key < self.key and self.left:
+            return self.left.search(key)
+        elif key > self.key and self.right:
+            return self.right.search(key)
+        return None
 
-    # Use QuickSort to display contacts alphabetically on the main page.
-    # Convert the LinkedList into a Python list using contacts.to_list(),
-    # then sort the list using quick_sort() before rendering the template.
-    contact_list = contacts.to_list()    
-    contact_list = quick_sort(contact_list)
-    
-    return render_template('index.html', 
-                         contacts=contact_list, 
-                         title=app.config['FLASK_TITLE'],
-                         elapsed_time=elapsed_time,
-                         search_result=None,
-                         search_query=None
-                         )
+# Copilot Prompt:
+# Implement a Binary Search Tree (BST) for category lookup.
+# Include insert and search operations to achieve O(log n) access time.
+class CategoryBST:
+    def __init__(self):
+        self.root = None
 
-@app.route('/add', methods=['POST'])
-# Any time the user performs a new operation (add/delete), clear the redo queue.
-# This prevents redoing states that no longer make sense after new edits.
-# Replace any redo_stack.clear() calls with redo_queue.clear().
-def add_contact():
-    """
-    Endpoint to add a new contact.
-    Students will update this to insert into their Data Structure.
-    """
-    name = request.form.get('name', '').strip()
-    email = request.form.get('email', '').strip()
-    # TODO: Before modifying the linked list, push current state to undo_stack and clear redo_stack
-    undo_stack.append(contacts.to_list())
-    redo_queue.clear()
-    
-    # Phase 1 Logic: Append to list
-    #contacts.append([name, email])
-    # Phase 2 Logic: Append to linked list and update hash index
-    global next_contact_id
-    new_contact = [next_contact_id, name, email]
-    contacts.append(new_contact)
-    contact_dict[name.lower()] = new_contact
-    next_contact_id += 1
-    
-    return redirect(url_for('index'))
+    def insert(self, key, value):
+        if not self.root:
+            self.root = BSTNode(key, value)
+        else:
+            self.root.insert(key, value)
+
+    def search(self, key):
+        if not self.root:
+            return None
+        return self.root.search(key)
 
 
-# Create a flask route for deleting a contact that:
-# 1. Gets the name of the contact to delete from the form
-# 2. Find the full contact using hash table
-# 3. Save current state to undo_stack and clear redo_stack
-# 4. Deletes the contact from the linked list and hash table
-# Any time the user performs a new operation (add/delete), clear the redo queue.
-# This prevents redoing states that no longer make sense after new edits.
-# Replace any redo_stack.clear() calls with redo_queue.clear().
-@app.route('/delete', methods=['POST'])
-def delete_contact():
+# Copilot Prompt:
+# Implement a priority queue using Python's heapq module.
+# Store VIP contacts with priority values so that higher priority
+# contacts are retrieved first (use negative values for max-heap behavior).
+class MaxHeap:
+    def __init__(self):
+        self.heap = []
 
-    contact_id = int(request.form.get('id'))
+    def insert(self, contact_id, priority):
+        heapq.heappush(self.heap, (-priority, contact_id))
 
-    # find the contact with matching ID
-    contact = None
+    def remove(self, contact_id):
+        self.heap = [item for item in self.heap if item[1] != contact_id]
+        heapq.heapify(self.heap)
+
+    def clear(self):
+        self.heap = []
+
+    def get_all_ids(self):
+        return [cid for _, cid in self.heap]
+
+
+# Initialize data structures
+category_tree = CategoryTree()
+category_bst = CategoryBST()
+vip_heap = MaxHeap()
+
+for cat in ["Work", "Personal"]:
+    node = category_tree.add_category("Contacts", cat)
+    category_bst.insert(cat, node)
+
+
+
+
+# Helper function to rebuild all derived data structures (hash table, tree, heap)
+# from the linked list to ensure consistency after updates, undo, and redo operations.
+
+vip_priority_map = {}
+
+def rebuild_hash_table():
+    contact_dict.clear()
     current = contacts.head
-
     while current:
-        if current.data[0] == contact_id:
-            contact = current.data
-            break
+        contact_dict[current.data[0]] = current.data
         current = current.next
 
-    if contact:
-        undo_stack.append(contacts.to_list())
-        redo_queue.clear()
+# Copilot Prompt:
+# Rebuild all derived data structures (hash table, tree, heap)
+# from the linked list to ensure consistency after updates,
+# undo, and redo operations.
+def rebuild_all_structures():
+    rebuild_hash_table()
 
-        contacts.delete(contact)
+    # Clear tree
+    category_tree.root.clear_contacts_recursive()
 
-        # remove from hash table using name
-        contact_dict.pop(contact[1].lower(), None)
+    # Rebuild tree
+    current = contacts.head
+    while current:
+        c = current.data
+        node = category_tree.get_category(c[3])
+        if node:
+            node.add_contact(c)
+        current = current.next
 
-    return redirect(url_for('index'))
+    # Rebuild heap
+    vip_heap.clear()
+    for cid, p in vip_priority_map.items():
+        vip_heap.insert(cid, p)
 
-# Replace the current hash-table search with QuickSort + Binary Search.
-# The search process should follow these steps:
-# 1. Convert the LinkedList of contacts into a Python list using contacts.to_list().
-# 2. Sort the list alphabetically using quick_sort().
-# 3. Use binary_search() to locate the target contact.
-# 4. Return the found contact (or None if not found).
-# 5. Render the sorted list so the UI displays contacts in alphabetical order.
-@app.route('/search')
-def search_contact():
-    query = request.args.get('query', '').strip()
-    result = None
 
-    # Step 1: Convert LinkedList to Python list
-    contact_list = contacts.to_list()
+def snapshot_state():
+    return {
+        "contacts": contacts.to_list(),
+        "next_id": next_contact_id,
+        "vip": dict(vip_priority_map)
+    }
 
-    # Step 2: Sort using QuickSort
-    sorted_contacts = quick_sort(contact_list)
 
-    # Step 3: Binary search
-    if query:
-        result = find_contact_by_id(sorted_contacts, int(query))
+def restore_state(state):
+    global next_contact_id, vip_priority_map
+    contacts.from_list(state["contacts"])
+    next_contact_id = state["next_id"]
+    vip_priority_map = dict(state["vip"])
+    rebuild_all_structures()
 
-    return render_template(
-        'index.html',
-        contacts=sorted_contacts,
-        title=app.config['FLASK_TITLE'],
-        elapsed_time=time.time() - start_time,
-        search_result=result,
-        search_query=query
-    )   
- 
-# Create a flask route for undo operation that:
-# Restores the most recent state from undo_stack
-# Saves the current sate to redo_queue
-# Redirects back to index page
-# Update undo() to use redo_queue (FIFO):
-# - If undo_stack is not empty, enqueue the current contacts snapshot onto redo_queue
-# - Pop the last snapshot from undo_stack and restore it into the linked list
-# - Rebuild the hash table index (contact_dict) after restoring
-@app.route('/undo', methods=['POST'])
-def undo():
-    if undo_stack:
-        # Save current state to redo queue (FIFO)
-        redo_queue.append(contacts.to_list())
 
-        # Restore last state from undo stack (LIFO)
-        last_state = undo_stack.pop()
-        contacts.from_list(last_state)
 
-        # Rebuild hash index after undo
-        contact_dict.clear()
-        current = contacts.head
-        while current:
-            name = current.data[1].lower()
-            contact_dict[name] = current.data
-            current = current.next
+# ROUTES
 
-    return redirect(url_for('index'))
-
-# Create a flask route for redo operation that:
-# Restores the most recent state from redo_queue
-# Saves the current sate to undo_stack
-# Redirects back to index page
-# Update redo() to use redo_queue (FIFO):
-# - If redo_queue is not empty, push the current contacts snapshot onto undo_stack
-# - Dequeue (popleft) the oldest snapshot from redo_queue and restore it
-# - Rebuild the hash table index (contact_dict) after restoring
-@app.route('/redo', methods=['POST'])
-def redo():
-    if redo_queue:
-        # Save current state to undo stack
-        undo_stack.append(contacts.to_list())
-
-        # Restore the oldest undone state (FIFO)
-        next_state = redo_queue.popleft()
-        contacts.from_list(next_state)
-
-        # Rebuild hash index after redo
-        contact_dict.clear()
-        current = contacts.head
-        while current:
-            name = current.data[1].lower()
-            contact_dict[name] = current.data
-            current = current.next
-
-    return redirect(url_for('index'))
-
-# Create a Flask route that runs the search benchmark using the
-# run_benchmark() function from benchmark.py. The results should
-# be returned to the index template so they can be displayed in
-# the GUI as a benchmark table.
-@app.route('/benchmark', methods=['POST'])
-def benchmark():
-
-    results = run_benchmark()
-
-    contact_list = contacts.to_list()
-    contact_list = quick_sort(contact_list)
+# Copilot Prompt:
+# Display all contacts by converting the linked list into a sorted list using QuickSort.
+# Extract VIP contacts using a heap-based priority queue.
+# Render both full contact list and VIP subset in the UI.
+@app.route('/')
+def index():
+    contact_list = quick_sort(contacts.to_list())
+    vip_ids = set(vip_heap.get_all_ids())
+    vip_contacts = [c for c in contact_list if c[0] in vip_ids]
 
     return render_template(
         'index.html',
         contacts=contact_list,
-        title=app.config['FLASK_TITLE'],
-        elapsed_time=time.time() - start_time,
-        search_result=None,
-        search_query=None,
-        benchmark_results=results
+        vip_contacts=vip_contacts,
+        elapsed_time=time.time() - start_time
     )
 
+# Copilot Prompt:
+# Add a new contact to the linked list and update the hash table.
+# Ensure the category exists using a BST for fast lookup.
+# If a priority is assigned, insert the contact into a heap-based VIP structure.
+# Rebuild all derived data structures after insertion to maintain consistency.
+@app.route('/add', methods=['POST'])
+def add_contact():
+    global next_contact_id
+
+    name = request.form.get('name', '')
+    email = request.form.get('email', '')
+    category = request.form.get('category', 'Work').title()
+
+    priority = int(request.form.get('priority') or 0)
+
+    undo_stack.append(snapshot_state())
+    redo_queue.clear()
+
+    new_contact = [next_contact_id, name, email, category]
+    contacts.append(new_contact)
+    contact_dict[new_contact[0]] = new_contact
+
+    # Ensure category exists in BST
+    node = category_bst.search(category)
+    if not node:
+        node = category_tree.add_category("Contacts", category)
+        category_bst.insert(category, node)
+
+    if priority > 0:
+        vip_priority_map[new_contact[0]] = priority
+        vip_heap.insert(new_contact[0], priority)
+
+    next_contact_id += 1
+
+    rebuild_all_structures()
+
+    return redirect(url_for('index'))
 
 
-# --- DATABASE CONNECTIVITY (For later phases) ---
-# Placeholders for students to fill in during Sessions 5 and 27
-def get_postgres_connection():
-    pass
+# Copilot Prompt:
+# Delete a contact from the linked list and hash table using its ID.
+# Remove the contact from the VIP heap if applicable.
+# Rebuild all data structures to maintain consistency after deletion.
+@app.route('/delete', methods=['POST'])
+def delete_contact():
+    contact_id = int(request.form.get('id', 0))
+    contact = contact_dict.get(contact_id)
 
-def get_mssql_connection():
-    pass
+    if contact:
+        undo_stack.append(snapshot_state())
+        redo_queue.clear()
+
+        contacts.delete(contact)
+        contact_dict.pop(contact_id, None)
+
+        vip_priority_map.pop(contact_id, None)
+        vip_heap.remove(contact_id)
+
+        # 🔥 FIX
+        rebuild_all_structures()
+
+    return redirect(url_for('index'))
+
+# Copilot Prompt:
+# Implement undo functionality using a stack.
+# Restore the previous application state and push the current state to the redo queue.
+@app.route('/undo', methods=['POST'])
+def undo():
+    if undo_stack:
+        redo_queue.append(snapshot_state())
+        restore_state(undo_stack.pop())
+    return redirect(url_for('index'))
+
+# Copilot Prompt:
+# Implement redo functionality using a queue (FIFO).
+# Restore the next available state and push the current state back to the undo stack.
+@app.route('/redo', methods=['POST'])
+def redo():
+    if redo_queue:
+        undo_stack.append(snapshot_state())
+        restore_state(redo_queue.popleft())
+    return redirect(url_for('index'))
+
 
 if __name__ == '__main__':
-    # Run the Flask app on port 5000, accessible externally
     app.run(host='0.0.0.0', port=5000, debug=True)

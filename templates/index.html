@@ -3,7 +3,7 @@
 
 <head>
 
-<title>{{ title }}Contact Manager</title>
+<title>{{ title }} Contact Manager</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -28,6 +28,11 @@ padding:10px;
 margin-bottom:10px;
 }
 
+.vip{
+background:#fff3cd;
+border-color:#ffdd57;
+}
+
 .container{
 display:grid;
 grid-template-columns:2fr 1fr;
@@ -37,6 +42,20 @@ gap:20px;
 .contact-list{
 max-height:420px;
 overflow-y:auto;
+}
+
+.tree{
+margin-left:10px;
+}
+
+.tree-category{
+margin-top:10px;
+font-weight:bold;
+}
+
+.tree-contact{
+margin-left:20px;
+padding:4px 0;
 }
 
 table{
@@ -57,15 +76,12 @@ cursor:pointer;
 }
 
 @media (max-width:900px){
-
 .container{
 grid-template-columns:1fr;
 }
-
 .contact-list{
 max-height:none;
 }
-
 }
 
 </style>
@@ -75,7 +91,7 @@ max-height:none;
 
 <body>
 
-<h1>{{ title }}Harrison's Contact Manager</h1>
+<h1>{{ title }} Harrison's Contact Manager</h1>
 
 <p>App has been running for: {{ "%.2f"|format(elapsed_time) }} seconds</p>
 
@@ -85,11 +101,8 @@ max-height:none;
 <h3>Search Contacts</h3>
 
 <form action="/search" method="GET">
-
 <input type="number" name="query" placeholder="Search by ID" required>
-
 <button type="submit">Search</button>
-
 </form>
 
 </div>
@@ -102,9 +115,10 @@ max-height:none;
 {% if search_result %}
 
 <div class="card">
-
-<strong>{{ search_result[0] }}</strong> - {{ search_result[1] }} - {{ search_result[2] }}
-
+<strong>ID:</strong> {{ search_result[0] }} |
+<strong>Name:</strong> {{ search_result[1] }} |
+<strong>Email:</strong> {{ search_result[2] }} |
+<strong>Category:</strong> {{ search_result[3] }}
 </div>
 
 {% else %}
@@ -126,8 +140,9 @@ max-height:none;
 <form action="/add" method="POST">
 
 <input type="text" name="name" placeholder="Name" required>
-
 <input type="email" name="email" placeholder="Email" required>
+<input type="text" name="category" placeholder="Category (Work, Personal, etc)">
+<input type="number" name="priority" placeholder="VIP Priority (0 = normal)">
 
 <button type="submit">Add to Data Structure</button>
 
@@ -139,21 +154,15 @@ max-height:none;
 <div style="margin-bottom:20px;">
 
 <form action="/undo" method="POST" style="display:inline;">
-
 <button type="submit">Undo</button>
-
 </form>
 
 <form action="/redo" method="POST" style="display:inline;margin-left:10px;">
-
 <button type="submit">Redo</button>
-
 </form>
 
 <form action="/benchmark" method="POST" style="display:inline;margin-left:20px;">
-
 <button type="submit">Run Search Benchmark</button>
-
 </form>
 
 </div>
@@ -164,7 +173,78 @@ max-height:none;
 
 <div>
 
-<h3>Current Contacts (In-Memory)</h3>
+<!--VIP Contacts--> 
+
+<h3>VIP Contacts</h3>
+
+{% if vip_contacts %}
+
+<div class="contact-list">
+
+{% for contact in vip_contacts %}
+
+<div class="card vip">
+<strong>{{ contact[0] }}</strong> - {{ contact[1] }} - {{ contact[2] }}
+<br><small><strong>Category:</strong> {{ contact[3] }}</small>
+
+<form action="/delete" method="POST" style="display:inline;margin-left:10px;">
+<input type="hidden" name="id" value="{{ contact[0] }}">
+<button type="submit">Delete</button>
+</form>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% else %}
+<p>No VIP contacts.</p>
+{% endif %}
+
+<hr>
+
+
+<!--Tree View-->
+
+
+<h3>Category Tree (Hierarchical View)</h3>
+
+<div class="section tree">
+
+<div class="tree-category">Contacts</div>
+
+{% set all_contacts = contacts %}
+
+{% set categories = [] %}
+{% for c in all_contacts %}
+    {% if c[3] not in categories %}
+        {% set _ = categories.append(c[3]) %}
+    {% endif %}
+{% endfor %}
+
+{% for category in categories %}
+
+<div class="tree-category" style="margin-left:15px;">
+└── {{ category }}
+</div>
+
+{% for contact in all_contacts %}
+    {% if contact[3] == category %}
+        <div class="tree-contact">
+            └── {{ contact[1] }} ({{ contact[2] }})
+        </div>
+    {% endif %}
+{% endfor %}
+
+{% endfor %}
+
+</div>
+
+<hr>
+
+
+<h3>All Contacts (In-Memory)</h3>
 
 <p><strong>Total Contacts:</strong> {{ contacts|length }}</p>
 
@@ -175,21 +255,17 @@ max-height:none;
 <div class="card">
 
 <strong>{{ contact[0] }}</strong> - {{ contact[1] }} - {{ contact[2] }}
+<br><small><strong>Category:</strong> {{ contact[3] }}</small>
 
 <form action="/delete" method="POST" style="display:inline;margin-left:10px;">
-
 <input type="hidden" name="id" value="{{ contact[0] }}">
-
 <button type="submit">Delete Contact</button>
-
 </form>
 
 </div>
 
 {% else %}
-
 <p>No contacts found.</p>
-
 {% endfor %}
 
 </div>
@@ -197,7 +273,7 @@ max-height:none;
 </div>
 
 
-
+<!--Benchmark Results-->
 <div>
 
 {% if benchmark_results is defined %}
@@ -211,25 +287,17 @@ max-height:none;
 <table>
 
 <tr>
-
 <th>Dataset Size</th>
-
 <th>Linear Search Time</th>
-
 <th>Binary Search Time</th>
-
 </tr>
 
 {% for row in benchmark_results %}
 
 <tr>
-
 <td>{{ row.size }}</td>
-
 <td>{{ "%.6f"|format(row.linear) }}</td>
-
 <td>{{ "%.6f"|format(row.binary) }}</td>
-
 </tr>
 
 {% endfor %}
@@ -247,63 +315,28 @@ max-height:none;
 const benchmarkData = {{ benchmark_results | tojson }};
 
 const sizes = benchmarkData.map(x => x.size);
-
 const linear = benchmarkData.map(x => x.linear);
-
 const binary = benchmarkData.map(x => x.binary);
-
 
 const ctx = document.getElementById('benchmarkChart').getContext('2d');
 
 new Chart(ctx,{
-
 type:'line',
-
 data:{
 labels:sizes,
-
 datasets:[
-
-{
-label:'Linear Search O(n)',
-data:linear,
-borderColor:'red',
-fill:false
-},
-
-{
-label:'Binary Search O(log n)',
-data:binary,
-borderColor:'green',
-fill:false
-}
-
+{label:'Linear Search O(n)',data:linear,borderColor:'red',fill:false},
+{label:'Binary Search O(log n)',data:binary,borderColor:'green',fill:false}
 ]
-
 },
-
 options:{
 responsive:true,
-plugins:{
-legend:{position:'top'}
-},
+plugins:{legend:{position:'top'}},
 scales:{
-x:{
-title:{
-display:true,
-text:'Dataset Size'
-}
-},
-y:{
-title:{
-display:true,
-text:'Execution Time (seconds)'
+x:{title:{display:true,text:'Dataset Size'}},
+y:{title:{display:true,text:'Execution Time (seconds)'}}
 }
 }
-}
-
-}
-
 });
 
 </script>
@@ -315,5 +348,4 @@ text:'Execution Time (seconds)'
 </div>
 
 </body>
-
 </html>
