@@ -249,16 +249,38 @@ category_tree = CategoryTree()
 category_bst = CategoryBST()
 vip_heap = MaxHeap()
 
-for cat in ["Work", "Personal"]:
-    node = category_tree.add_category("Contacts", cat)
-    category_bst.insert(cat, node)
+# Copilot Prompt:
+# Create a static 3-level hierarchy representing an organization:
+# Contacts -> Work-> IT/HR-> Teams
+# Contacts-> Personal-> Family/Friends
+# Level 1
+category_tree.add_category("Contacts", "Work")
+category_tree.add_category("Contacts", "Personal")
+# Level 2
+category_tree.add_category("Work", "IT")
+category_tree.add_category("Work", "HR")
+# Level 3 (Work)
+category_tree.add_category("IT", "Infrastructure")
+category_tree.add_category("IT", "Security")
+category_tree.add_category("HR", "Recruiting")
+category_tree.add_category("HR", "Payroll")
+# Level 2 (Personal)
+category_tree.add_category("Personal", "Family")
+category_tree.add_category("Personal", "Friends")
 
-
-
+# Insert ALL categories into BST
+for name in [
+    "Work", "Personal",
+    "IT", "HR",
+    "Infrastructure", "Security",
+    "Recruiting", "Payroll",
+    "Family", "Friends"
+]:
+    node = category_tree.get_category(name)
+    category_bst.insert(name, node)
 
 # Helper function to rebuild all derived data structures (hash table, tree, heap)
 # from the linked list to ensure consistency after updates, undo, and redo operations.
-
 vip_priority_map = {}
 
 def rebuild_hash_table():
@@ -308,7 +330,15 @@ def restore_state(state):
     vip_priority_map = dict(state["vip"])
     rebuild_all_structures()
 
-
+# Copilot Prompt:
+# Create a function to recursively traverse the category tree and build a nested structure
+# for rendering in the UI, preserving hierarchy and contacts at each node.
+def build_tree_view(node):
+    return {
+        "name": node.value,
+        "contacts": node.contacts,
+        "children": [build_tree_view(child) for child in node.children]
+    }
 
 # ROUTES
 
@@ -321,12 +351,15 @@ def index():
     contact_list = quick_sort(contacts.to_list())
     vip_ids = set(vip_heap.get_all_ids())
     vip_contacts = [c for c in contact_list if c[0] in vip_ids]
+    tree_data = build_tree_view(category_tree.root)
 
     return render_template(
-        'index.html',
-        contacts=contact_list,
-        vip_contacts=vip_contacts,
-        elapsed_time=time.time() - start_time
+    'index.html',
+    contacts=contact_list,
+    vip_contacts=vip_contacts,
+    tree=tree_data,
+    benchmark=None, 
+    elapsed_time=time.time() - start_time
     )
 
 # Copilot Prompt:
@@ -340,7 +373,7 @@ def add_contact():
 
     name = request.form.get('name', '')
     email = request.form.get('email', '')
-    category = request.form.get('category', 'Work').title()
+    category = request.form.get('category', 'Family').title()
 
     priority = int(request.form.get('priority') or 0)
 
@@ -365,7 +398,8 @@ def add_contact():
 
     rebuild_all_structures()
 
-    return redirect(url_for('index'))
+    return redirect(url_for('index')
+    )
 
 
 # Copilot Prompt:
@@ -390,7 +424,8 @@ def delete_contact():
         # 🔥 FIX
         rebuild_all_structures()
 
-    return redirect(url_for('index'))
+    return redirect(url_for('index')
+    )
 
 # Copilot Prompt:
 # Implement undo functionality using a stack.
@@ -400,7 +435,8 @@ def undo():
     if undo_stack:
         redo_queue.append(snapshot_state())
         restore_state(undo_stack.pop())
-    return redirect(url_for('index'))
+    return redirect(url_for('index')
+    )
 
 # Copilot Prompt:
 # Implement redo functionality using a queue (FIFO).
@@ -410,8 +446,35 @@ def redo():
     if redo_queue:
         undo_stack.append(snapshot_state())
         restore_state(redo_queue.popleft())
-    return redirect(url_for('index'))
+    return redirect(url_for('index')
+    )
 
+# Copilot Prompt:
+# Create a Flask route that runs the benchmark module and displays results.
+# The route should:
+# 1. Call run_benchmark() from benchmark.py
+# 2. Rebuild the contact list (sorted using quick_sort)
+# 3. Extract VIP contacts using the heap
+# 4. Build the category tree view for display
+# 5. Render index.html and pass the benchmark results along with existing data
+@app.route('/benchmark', methods=['POST'])
+def benchmark():
+    results = run_benchmark()
+
+    contact_list = quick_sort(contacts.to_list())
+    vip_ids = set(vip_heap.get_all_ids())
+    vip_contacts = [c for c in contact_list if c[0] in vip_ids]
+
+    tree_data = build_tree_view(category_tree.root)
+
+    return render_template(
+    'index.html',
+    contacts=contact_list,
+    vip_contacts=vip_contacts,
+    tree=tree_data,
+    benchmark_results=results,
+    elapsed_time=time.time() - start_time
+)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

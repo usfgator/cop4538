@@ -135,13 +135,20 @@ max-height:none;
 
 <div class="section">
 
-<h3>Add New Contact</h3>
+<p>Select a category from the organizational hierarchy.</p>
 
 <form action="/add" method="POST">
 
 <input type="text" name="name" placeholder="Name" required>
 <input type="email" name="email" placeholder="Email" required>
-<input type="text" name="category" placeholder="Category (Work, Personal, etc)">
+<select name="category" required>
+    <option value="Security">Work-> IT-> Security</option>
+    <option value="Infrastructure">Work-> IT -> Infrastructure</option>
+    <option value="Recruiting">Work-> HR-> Recruiting</option>
+    <option value="Payroll">Work-> HR-> Payroll</option>
+    <option value="Family">Personal-> Family</option>
+    <option value="Friends">Personal-> Friends</option>
+</select>
 <input type="number" name="priority" placeholder="VIP Priority (0 = normal)">
 
 <button type="submit">Add to Data Structure</button>
@@ -212,32 +219,29 @@ max-height:none;
 
 <div class="section tree">
 
-<div class="tree-category">Contacts</div>
+{% macro render_node(node, level=0) %}
+    <div style="margin-left:{{ level * 20 }}px">
+        <strong>{{ node.name }}</strong>
+    </div>
 
-{% set all_contacts = contacts %}
-
-{% set categories = [] %}
-{% for c in all_contacts %}
-    {% if c[3] not in categories %}
-        {% set _ = categories.append(c[3]) %}
-    {% endif %}
-{% endfor %}
-
-{% for category in categories %}
-
-<div class="tree-category" style="margin-left:15px;">
-└── {{ category }}
-</div>
-
-{% for contact in all_contacts %}
-    {% if contact[3] == category %}
-        <div class="tree-contact">
+    {% for contact in node.contacts %}
+        <div style="margin-left:{{ (level + 1) * 20 }}px">
             └── {{ contact[1] }} ({{ contact[2] }})
         </div>
-    {% endif %}
-{% endfor %}
+    {% endfor %}
 
-{% endfor %}
+    {% for child in node.children %}
+        {{ render_node(child, level + 1) }}
+    {% endfor %}
+{% endmacro %}
+
+{{ render_node(tree) }}
+
+</div>
+
+
+
+
 
 </div>
 
@@ -282,7 +286,7 @@ max-height:none;
 
 <p>This benchmark compares <strong>Linear Search O(n)</strong> vs <strong>Binary Search O(log n)</strong>.</p>
 
-<p><strong>Dataset sizes tested:</strong> 100, 1000, 5000</p>
+<p><strong>Dataset sizes tested:</strong> 1000, 10000, 50000</p>
 
 <table>
 
