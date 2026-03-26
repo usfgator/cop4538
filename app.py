@@ -1,3 +1,4 @@
+#version 1.0
 from collections import deque
 from benchmark import run_benchmark
 from flask import Flask, render_template, request, redirect, url_for
