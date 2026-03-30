@@ -1,5 +1,6 @@
 #version 1.0
 from collections import deque
+from unittest import result
 from benchmark import run_benchmark
 from flask import Flask, render_template, request, redirect, url_for
 import time
@@ -13,6 +14,7 @@ start_time = time.time()
 # Initial data structures for undo/redo
 undo_stack = []
 redo_queue = deque()
+
 
 # Hash table for O(1) lookups
 contact_dict = {}
@@ -242,7 +244,37 @@ class MaxHeap:
         self.heap = []
 
     def get_all_ids(self):
-        return [cid for _, cid in self.heap]
+        sorted_heap = sorted(self.heap)
+        return [cid for _, cid in sorted_heap]
+    
+    # Copilot Prompt:
+    # Implement extract_max to remove and return the highest priority contact ID
+    # from the heap, restoring heap structure after removal.
+    def extract_max(self):
+        if not self.heap:
+            return None
+        _, contact_id = heapq.heappop(self.heap)
+        return contact_id
+    
+    # Copilot Prompt:
+    # Retrieve all elements in priority order using extract_max without modifying
+    # the original heap by operating on a copy of the heap.
+    def extract_all_in_order(self):
+        temp_heap = list(self.heap)
+        result = []
+        while temp_heap:
+            _, cid = heapq.heappop(temp_heap)
+            result.append(cid)
+
+        return result
+    
+    # Copilot Prompt:
+    # Add a method to retrieve all elements from the max heap in descending priority order
+    # without modifying the original heap. 
+    def get_all_in_priority_order(self):
+        # Sort by priority
+        sorted_heap = sorted(self.heap)
+        return [contact_id for (_, contact_id) in sorted_heap]
 
 
 # Initialize data structures
@@ -350,8 +382,11 @@ def build_tree_view(node):
 @app.route('/')
 def index():
     contact_list = quick_sort(contacts.to_list())
-    vip_ids = set(vip_heap.get_all_ids())
-    vip_contacts = [c for c in contact_list if c[0] in vip_ids]
+    # Copilot Prompt:
+    # Retrieve VIP contacts in true priority order using the max heap.
+    # Map heap-ordered contact IDs back to full contact records using the hash table.
+    vip_ids_ordered = vip_heap.extract_all_in_order()
+    vip_contacts = [contact_dict[cid] for cid in vip_ids_ordered if cid in contact_dict]
     tree_data = build_tree_view(category_tree.root)
 
     return render_template(
@@ -422,7 +457,7 @@ def delete_contact():
         vip_priority_map.pop(contact_id, None)
         vip_heap.remove(contact_id)
 
-        # 🔥 FIX
+        
         rebuild_all_structures()
 
     return redirect(url_for('index')
@@ -451,6 +486,48 @@ def redo():
     )
 
 # Copilot Prompt:
+# Implement a search route that retrieves a contact by ID using binary search.
+# The route should:
+# 1. Accept a query parameter from the request
+# 2. Convert the linked list to a sorted list using quick_sort
+# 3. Use binary search to find the contact
+# 4. Render index.html with the search result displayed
+
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('query')
+
+    if not query:
+        return redirect(url_for('index'))
+
+    try:
+        query_id = int(query)
+    except ValueError:
+        return redirect(url_for('index'))
+
+    # Convert to sorted list for binary search
+    sorted_contacts = quick_sort(contacts.to_list())
+
+    # Perform binary search
+    result = find_contact_by_id(sorted_contacts, query_id)
+
+    # Keep VIP and tree data consistent with index()
+    vip_ids_ordered = vip_heap.extract_all_in_order()
+    vip_contacts = [contact_dict[cid] for cid in vip_ids_ordered if cid in contact_dict]
+    tree_data = build_tree_view(category_tree.root)
+
+    return render_template(
+        'index.html',
+        contacts=sorted_contacts,
+        vip_contacts=vip_contacts,
+        tree=tree_data,
+        search_query=query_id,
+        search_result=result,
+        benchmark=None,
+        elapsed_time=time.time() - start_time
+    )
+
+# Copilot Prompt:
 # Create a Flask route that runs the benchmark module and displays results.
 # The route should:
 # 1. Call run_benchmark() from benchmark.py
@@ -458,13 +535,14 @@ def redo():
 # 3. Extract VIP contacts using the heap
 # 4. Build the category tree view for display
 # 5. Render index.html and pass the benchmark results along with existing data
+
 @app.route('/benchmark', methods=['POST'])
 def benchmark():
     results = run_benchmark()
 
     contact_list = quick_sort(contacts.to_list())
-    vip_ids = set(vip_heap.get_all_ids())
-    vip_contacts = [c for c in contact_list if c[0] in vip_ids]
+    vip_ids_ordered = vip_heap.extract_all_in_order()
+    vip_contacts = [contact_dict[cid] for cid in vip_ids_ordered if cid in contact_dict]
 
     tree_data = build_tree_view(category_tree.root)
 
